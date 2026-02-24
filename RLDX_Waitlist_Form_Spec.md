@@ -45,7 +45,7 @@ Q7. What is your role?
 Type: Multiple choice
 Required: Yes
 Description: Select the option that best describes your current role.
-Options: Professor / PI, PhD / Postdoc / Researcher, Student (Undergrad / Masters), Founder / C-level, R&D / Research, Engineering / Product, Operations / Deployment, Business / Strategy
+Options: Professor / Principal Investigator, PhD / Postdoc / Researcher, Student (Undergrad / Masters), Founder / C-level, R&D / Research, Engineering / Product, Operations / Deployment, Business / Strategy
 Other: Yes (enable built-in Other with text input)
 
 Q8. Which communities are you part of?
@@ -106,7 +106,7 @@ Options: Create content (video / blog / social media), Give a testimonial at RLD
 Q17. Would you attend an RLDX launch event?
 Type: Multiple choice
 Required: Yes
-Options: Yes in person (US) — May 2026, Yes in person (Korea) — May 2026, Yes in person (Japan) — June 2026, Yes virtually, Maybe, No
+Options: Yes in person (US) - May 2026 (Tentative), Yes in person (Japan) - May 2026 (Tentative), Yes in person (Korea) - June 2026 (Tentative), Yes virtually, Maybe, No
 
 Q18. How did you hear about RLDX?
 Type: Multiple choice

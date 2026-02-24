@@ -48,7 +48,7 @@ const LABELS = {
     independent: 'Independent / Hobbyist', other: 'Other',
   },
   academicRole: {
-    professor: 'Professor / PI', postdoc: 'PhD / Postdoc / Researcher',
+    professor: 'Professor / Principal Investigator', postdoc: 'PhD / Postdoc / Researcher',
     student: 'Student (Undergrad / Masters)',
   },
   industryRole: {
@@ -107,8 +107,8 @@ const LABELS = {
     testimonial: 'Testimonial at launch event',
   },
   eventAttendance: {
-    us_inperson: 'In person (US)', kr_inperson: 'In person (Korea)',
-    jp_inperson: 'In person (Japan)', virtual: 'Virtual',
+    us_inperson: 'In person (US) - May 2026 (Tentative)', kr_inperson: 'In person (Korea) - June 2026 (Tentative)',
+    jp_inperson: 'In person (Japan) - May 2026 (Tentative)', virtual: 'Virtual',
     maybe: 'Maybe', no: 'No',
   },
   referralSource: {
@@ -258,30 +258,11 @@ async function getExistingEmails() {
 function buildProperties(row) {
   const fd = row.form_data || {};
 
-  // Get "Other" specify values where applicable
-  const affiliationLabel = fd.affiliation === 'other' && fd.affiliationOther
-    ? `Other: ${fd.affiliationOther}` : label(LABELS.affiliation, fd.affiliation);
-  const referralLabel = fd.referralSource === 'other' && fd.referralSourceOther
-    ? `Other: ${fd.referralSourceOther}` : label(LABELS.referralSource, fd.referralSource);
-
   const props = {
     'Name': { title: richText(row.full_name || fd.fullName || '') },
     'Email': { email: row.email || fd.email || null },
     'Organization': { rich_text: richText(row.organization || fd.organization || '') },
     'Country': { select: { name: label(LABELS.country, row.country || fd.country) || 'Other' } },
-    'Affiliation': { select: { name: affiliationLabel || 'Other' } },
-    'Role': { rich_text: richText(deriveRole(fd)) },
-    'Robot Access': { select: { name: label(LABELS.robotAccess, fd.robotAccess) || 'Just interested' } },
-    'Sim Access': { select: { name: label(LABELS.simAccess, fd.simAccess) || 'No access' } },
-    'Use Cases': {
-      multi_select: labelArray(LABELS.useCase, fd.useCase).map(n => ({ name: n })),
-    },
-    'Applications': {
-      multi_select: labelArray(LABELS.applications, fd.applications).map(n => ({ name: n })),
-    },
-    'Event': { select: { name: label(LABELS.eventAttendance, fd.eventAttendance) || 'No' } },
-    'Referral': { select: { name: referralLabel || 'Other' } },
-    'Share Willing': { select: { name: label(LABELS.shareWilling, fd.shareWilling) || 'No' } },
   };
 
   // Social Profile — only include if valid URL
@@ -301,19 +282,6 @@ function buildProperties(row) {
 // ============================================
 // Transform — Supabase row → Notion page content
 // ============================================
-
-function buildContactSection(row, fd) {
-  const blocks = [];
-  blocks.push(heading2('Contact'));
-  blocks.push(bullet(labelValue('Email', row.email || fd.email)));
-  blocks.push(bullet(labelValue('Organization', row.organization || fd.organization)));
-  blocks.push(bullet(labelValue('Country', label(LABELS.country, row.country || fd.country))));
-  const social = row.social_profile || fd.socialProfile;
-  if (social) {
-    blocks.push(bullet(labelValue('Social', social)));
-  }
-  return blocks;
-}
 
 function buildBackgroundSection(fd) {
   const blocks = [];
@@ -406,8 +374,6 @@ function buildEngagementSection(fd) {
 function buildPageContent(row) {
   const fd = row.form_data || {};
   return [
-    ...buildContactSection(row, fd),
-    divider(),
     ...buildBackgroundSection(fd),
     divider(),
     ...buildHardwareSection(fd),
