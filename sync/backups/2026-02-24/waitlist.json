@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "date": "2026-02-24",
+    "timestamp": "2026-02-24T06:02:36.666Z",
+    "totalRows": 1
+  },
+  "rows": [
+    {
+      "id": 34,
+      "created_at": "2026-02-24T05:40:06.509095+00:00",
+      "email": "jsstephano@gmail.com",
+      "full_name": "Junsang Yoo",
+      "organization": "RLWRLD",
+      "country": "KR",
+      "social_profile": null,
+      "form_data": {
+        "email": "jsstephano@gmail.com",
+        "country": "KR",
+        "useCase": "prototype",
+        "fullName": "Junsang Yoo",
+        "simAccess": "no",
+        "affiliation": "academic",
+        "robotAccess": "interested",
+        "academicRole": "student",
+        "applications": "bin_picking",
+        "organization": "RLWRLD",
+        "shareWilling": "no",
+        "industryOther": "",
+        "socialProfile": "",
+        "referralSource": "social",
+        "robotTypeOther": "",
+        "eventAttendance": "kr_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      }
+    }
+  ]
+}
