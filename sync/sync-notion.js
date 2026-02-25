@@ -4,7 +4,10 @@
  * RLDX Waitlist → Notion Sync Script
  *
  * Fetches waitlist submissions from Supabase and creates
- * structured Notion pages with properties + detailed content.
+ * Notion database rows with all form data as properties.
+ *
+ * All labels, section groupings, and question texts are
+ * auto-extracted from index.html — zero hardcoded mappings.
  *
  * Usage: node sync-notion.js [--dry-run]
  *
@@ -31,167 +34,195 @@ const DRY_RUN = process.argv.includes('--dry-run');
 // ============================================
 const NOTION_PAGE_SIZE = 100;
 const NOTION_RATE_LIMIT_DELAY = 350;
-const PREVIEW_WIDTH = 56;
+const PREVIEW_WIDTH = 72;
+
+// Profile fields stored as individual Notion columns (not merged into sections)
+const PROFILE_KEYS = ['fullName', 'email', 'organization', 'country', 'socialProfile'];
 
 // ============================================
-// Label Maps — code → human-readable
+// Auto-extract from index.html
 // ============================================
-const LABELS = {
-  country: {
-    US: 'United States', KR: 'South Korea', JP: 'Japan', CN: 'China',
-    DE: 'Germany', UK: 'United Kingdom', CA: 'Canada', AU: 'Australia',
-    SG: 'Singapore', other: 'Other',
-  },
-  affiliation: {
-    academic: 'Academic', industry: 'Industry / Corporate', startup: 'Startup',
-    investor: 'Investor / VC', media: 'Media / Content Creator',
-    independent: 'Independent / Hobbyist', other: 'Other',
-  },
-  academicRole: {
-    professor: 'Professor / Principal Investigator', postdoc: 'PhD / Postdoc / Researcher',
-    student: 'Student (Undergrad / Masters)',
-  },
-  industryRole: {
-    rd: 'R&D / Research', engineering: 'Engineering / Product',
-    operations: 'Operations / Deployment', business: 'Business / Strategy',
-  },
-  startupRole: {
-    founder: 'Founder / C-level', engineer: 'Engineer / Researcher', other: 'Other',
-  },
-  industry: {
-    manufacturing: 'Manufacturing', logistics: 'Logistics / Warehousing',
-    food: 'Food & Beverage', healthcare: 'Healthcare / Medical',
-    retail: 'Retail / Service', automotive: 'Automotive',
-    electronics: 'Electronics', aerospace: 'Aerospace',
-    agriculture: 'Agriculture', construction: 'Construction', other: 'Other',
-  },
-  communities: {
-    openarm: 'OpenArm', lerobot: 'LeRobot', huggingface: 'Hugging Face Robotics',
-    ros: 'ROS Community', pai_social: 'Physical AI Discord / Twitter',
-    none: 'None', other: 'Other',
-  },
-  robotAccess: {
-    own: 'Owns/operates robots', lab: 'Through lab/company',
-    planning: 'Planning to get one', interested: 'Just interested',
-  },
-  robotType: {
-    humanoid: 'Humanoid (full-body)', bimanual: 'Bimanual Arm System',
-    single_arm: 'Single Arm (6-7 DOF)', mobile: 'Mobile Manipulator',
-    dexterous_hand: 'Dexterous Hand System', other: 'Other',
-  },
-  robotBrand: {
-    aloha: 'ALOHA', franka: 'Franka', kuka: 'KUKA', ur: 'Universal Robots',
-    unitree: 'Unitree', fourier: 'Fourier', agilex: 'AgileX', trossen: 'Trossen',
-    lerobot_so100: 'LeRobot SO-100', rlwrld: 'RLWRLD ALLEX / OpenArm',
-    custom: 'Custom-built', other: 'Other',
-  },
-  simAccess: {
-    rtx4090_plus: 'RTX 4090+ (24GB+)', cloud: 'Cloud GPU (L40S or equivalent)',
-    planning: 'Planning to set up', no: 'No access',
-  },
-  useCase: {
-    benchmark: 'Benchmark', finetune: 'Fine-tune', integrate: 'Integrate',
-    deploy: 'Deploy', prototype: 'Prototype', hobby: 'Personal/Hobby',
-    explore: 'Just explore',
-  },
-  applications: {
-    bin_picking: 'Bin picking', assembly: 'Assembly', packaging: 'Packaging',
-    tool_use: 'Tool use', handover: 'Object handover',
-    cable: 'Cable manipulation', cloth: 'Cloth handling',
-    food: 'Food handling', cleaning: 'Cleaning', door: 'Door/drawer',
-    writing: 'Writing/drawing', other: 'Other',
-  },
-  shareWilling: { yes: 'Yes', maybe: 'Maybe', no: 'No' },
-  shareType: {
-    content: 'Create content (video/blog/social)',
-    testimonial: 'Testimonial at launch event',
-  },
-  eventAttendance: {
-    us_inperson: 'In person (San Francisco, US) - Q2 2026', kr_inperson: 'In person (Seoul, Korea) - Q2 2026',
-    jp_inperson: 'In person (Tokyo, Japan) - Q2 2026', virtual: 'Virtual',
-    maybe: 'Maybe', no: 'No',
-  },
-  referralSource: {
-    social: 'Social media', news: 'News / Conference',
-    word_of_mouth: 'Word of mouth', website: 'RLWRLD website', other: 'Other',
-  },
-};
+
+function parseHtml() {
+  const htmlPath = path.join(__dirname, '..', 'index.html');
+  const html = fs.readFileSync(htmlPath, 'utf8');
+  return html;
+}
+
+/**
+ * Extract LABELS: { fieldName: { value: "option-label text" } }
+ */
+function extractLabels(html) {
+  const labels = {};
+
+  // radio/checkbox: name before value
+  const r1 = /<input\s+type="(?:radio|checkbox)"\s+[^>]*name="([^"]+)"\s+[^>]*value="([^"]+)"[^>]*>\s*<span\s+class="option-label">([^<]+)<\/span>/g;
+  let m;
+  while ((m = r1.exec(html)) !== null) {
+    const [, name, value, text] = m;
+    if (!labels[name]) labels[name] = {};
+    labels[name][value] = text.trim();
+  }
+
+  // radio/checkbox: value before name (attribute order varies)
+  const r2 = /<input\s+type="(?:radio|checkbox)"\s+[^>]*value="([^"]+)"\s+[^>]*name="([^"]+)"[^>]*>\s*<span\s+class="option-label">([^<]+)<\/span>/g;
+  while ((m = r2.exec(html)) !== null) {
+    const [, value, name, text] = m;
+    if (!labels[name]) labels[name] = {};
+    if (!labels[name][value]) labels[name][value] = text.trim();
+  }
+
+  // <select> options
+  const selectRe = /<select[^>]+name="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g;
+  while ((m = selectRe.exec(html)) !== null) {
+    const [, name, optionsHtml] = m;
+    if (!labels[name]) labels[name] = {};
+    const optRe = /<option\s+value="([^"]*)"[^>]*>([^<]+)<\/option>/g;
+    let om;
+    while ((om = optRe.exec(optionsHtml)) !== null) {
+      const [, value, text] = om;
+      if (value) labels[name][value] = text.trim();
+    }
+  }
+
+  return labels;
+}
+
+/**
+ * Extract section structure: [{ title, fields: [{ key, question }] }]
+ * Reads form-section blocks, section-title, form-label, and input names.
+ */
+function extractSections(html) {
+  const sectionRegex = /<div\s+class="form-section">([\s\S]*?)(?=<div\s+class="form-section">|<!-- Honeypot|<div\s+class="submit-section")/g;
+  let m;
+  const sections = [];
+
+  while ((m = sectionRegex.exec(html)) !== null) {
+    const block = m[1];
+
+    // Section title
+    const titleMatch = block.match(/<h3\s+class="section-title">([^<]+)<\/h3>/);
+    const title = titleMatch ? titleMatch[1].trim() : 'Other';
+
+    // Find each form-label and the input names that follow it
+    const fields = [];
+    const labelRegex = /<label[^>]*class="form-label"[^>]*>([\s\S]*?)<\/label>/g;
+    let lm;
+    const labelPositions = [];
+
+    while ((lm = labelRegex.exec(block)) !== null) {
+      let text = lm[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      text = text.replace(/\s*\*\s*/g, ' ').trim();
+      text = text.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      labelPositions.push({ text, endPos: lm.index + lm[0].length });
+    }
+
+    for (let i = 0; i < labelPositions.length; i++) {
+      const startPos = labelPositions[i].endPos;
+      const endPos = i + 1 < labelPositions.length ? labelPositions[i + 1].endPos : block.length;
+      const region = block.substring(startPos, endPos);
+
+      const names = [];
+      const seen = new Set();
+      const nameRegex = /name="([^"]+)"/g;
+      let nm;
+      while ((nm = nameRegex.exec(region)) !== null) {
+        if (nm[1] !== 'website' && !seen.has(nm[1])) {
+          seen.add(nm[1]);
+          names.push(nm[1]);
+        }
+      }
+
+      for (const name of names) {
+        fields.push({ key: name, question: labelPositions[i].text });
+      }
+    }
+
+    sections.push({ title, fields });
+  }
+
+  return sections;
+}
+
+const HTML = parseHtml();
+const LABELS = extractLabels(HTML);
+const SECTIONS = extractSections(HTML);
 
 // ============================================
 // Helpers
 // ============================================
 
-/** Normalize value to array (handles single string or array) */
+/** Normalize value to array */
 function toArray(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val;
   return [val];
 }
 
-/** Look up label, fall back to raw code */
-function label(map, code) {
+/** Look up display text for a code value, fall back to raw code */
+function resolveLabel(fieldKey, code) {
   if (!code) return '';
-  return map[code] || code;
+  const map = LABELS[fieldKey];
+  if (map && map[code]) return map[code];
+  return code;
 }
 
-/** Map an array of codes to labels */
-function labelArray(map, codes) {
-  return toArray(codes).map(c => label(map, c)).filter(Boolean);
+/** Resolve a single or array value to display text(s) */
+function resolveValue(fieldKey, val) {
+  if (!val || val === '') return '';
+  if (Array.isArray(val)) {
+    return val.map(v => resolveLabel(fieldKey, v)).filter(Boolean).join(', ');
+  }
+  return resolveLabel(fieldKey, val);
 }
 
-/** Derive the role text based on affiliation */
-function deriveRole(fd) {
-  const aff = fd.affiliation;
-  if (aff === 'academic') {
-    const r = label(LABELS.academicRole, fd.academicRole);
-    return r || '';
-  }
-  if (aff === 'industry') {
-    const r = label(LABELS.industryRole, fd.industryRole);
-    return r || '';
-  }
-  if (aff === 'startup') {
-    let r = label(LABELS.startupRole, fd.startupRole);
-    if (fd.startupRole === 'other' && fd.startupRoleOther) {
-      r = fd.startupRoleOther;
+/** Build merged text for a section from form_data */
+function buildSectionText(section, fd) {
+  const lines = [];
+  const processedKeys = new Set();
+
+  for (const field of section.fields) {
+    const { key, question } = field;
+    if (processedKeys.has(key)) continue;
+    if (PROFILE_KEYS.includes(key)) continue;
+
+    const isOtherField = key.endsWith('Other');
+    if (isOtherField) continue; // handled inline with the parent field
+
+    const val = fd[key];
+    if (val === undefined || val === null) continue;
+
+    processedKeys.add(key);
+
+    let displayVal = resolveValue(key, val);
+    if (!displayVal && val === '') continue;
+
+    // Append "Other" text input if present
+    const otherKey = key + 'Other';
+    const otherVal = fd[otherKey];
+    if (otherVal && otherVal !== '') {
+      // If the selected value was "other", show "Other: <text>"
+      const rawVal = Array.isArray(val) ? val : [val];
+      if (rawVal.includes('other')) {
+        // Replace "Other" in the display with "Other: <text>"
+        const otherLabel = resolveLabel(key, 'other');
+        displayVal = displayVal.replace(otherLabel, `${otherLabel}: ${otherVal}`);
+      } else {
+        displayVal += `, ${otherVal}`;
+      }
     }
-    return r || '';
+
+    if (displayVal) {
+      lines.push(`${question}: ${displayVal}`);
+    }
   }
-  return '';
+
+  return lines.join('\n');
 }
 
 /** Create a Notion rich_text array from a string */
 function richText(content) {
   return [{ type: 'text', text: { content: content || '' } }];
-}
-
-/** Create a bold + normal rich_text pair: "Label: Value" */
-function labelValue(lbl, val) {
-  return [
-    { type: 'text', text: { content: `${lbl}: ` }, annotations: { bold: true } },
-    { type: 'text', text: { content: val || '—' } },
-  ];
-}
-
-/** Create a heading_2 block */
-function heading2(text) {
-  return {
-    object: 'block', type: 'heading_2',
-    heading_2: { rich_text: richText(text) },
-  };
-}
-
-/** Create a bulleted_list_item block */
-function bullet(richTextArr) {
-  return {
-    object: 'block', type: 'bulleted_list_item',
-    bulleted_list_item: { rich_text: richTextArr },
-  };
-}
-
-/** Create a divider block */
-function divider() {
-  return { object: 'block', type: 'divider', divider: {} };
 }
 
 // ============================================
@@ -210,6 +241,57 @@ async function fetchSupabaseRows() {
   );
   if (!res.ok) throw new Error(`Supabase fetch failed: ${res.status} ${await res.text()}`);
   return res.json();
+}
+
+// ============================================
+// Notion — Ensure section columns exist
+// ============================================
+
+async function ensureSectionColumns() {
+  // Fetch current database schema
+  const res = await fetch(
+    `https://api.notion.com/v1/databases/${CONFIG.notion.databaseId}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${CONFIG.notion.token}`,
+        'Notion-Version': '2022-06-28',
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`Notion DB fetch failed: ${res.status} ${await res.text()}`);
+  const db = await res.json();
+  const existingProps = Object.keys(db.properties);
+
+  // Find missing section columns
+  const neededColumns = SECTIONS
+    .filter(s => s.title !== 'Contact Information')
+    .map(s => s.title);
+
+  const missing = neededColumns.filter(col => !existingProps.includes(col));
+  if (missing.length === 0) return;
+
+  console.log(`  Adding Notion columns: ${missing.join(', ')}`);
+
+  // Add missing columns as rich_text properties
+  const properties = {};
+  for (const col of missing) {
+    properties[col] = { rich_text: {} };
+  }
+
+  const updateRes = await fetch(
+    `https://api.notion.com/v1/databases/${CONFIG.notion.databaseId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.notion.token}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28',
+      },
+      body: JSON.stringify({ properties }),
+    }
+  );
+  if (!updateRes.ok) throw new Error(`Notion DB update failed: ${updateRes.status} ${await updateRes.text()}`);
+  console.log('  Columns added successfully.\n');
 }
 
 // ============================================
@@ -262,7 +344,7 @@ function buildProperties(row) {
     'Name': { title: richText(row.full_name || fd.fullName || '') },
     'Email': { email: row.email || fd.email || null },
     'Organization': { rich_text: richText(row.organization || fd.organization || '') },
-    'Country': { select: { name: label(LABELS.country, row.country || fd.country) || 'Other' } },
+    'Country': { select: { name: resolveLabel('country', row.country || fd.country) || 'Other' } },
   };
 
   // Social Profile — only include if valid URL
@@ -276,123 +358,27 @@ function buildProperties(row) {
     props['Submitted'] = { date: { start: row.created_at.split('T')[0] } };
   }
 
+  // Section columns — skip "Contact Information" (already covered by profile fields)
+  for (const section of SECTIONS) {
+    if (section.title === 'Contact Information') continue;
+
+    const text = buildSectionText(section, fd);
+    if (text) {
+      props[section.title] = { rich_text: richText(text) };
+    }
+  }
+
   return props;
-}
-
-// ============================================
-// Transform — Supabase row → Notion page content
-// ============================================
-
-function buildBackgroundSection(fd) {
-  const blocks = [];
-  blocks.push(heading2('Background'));
-  let affText = label(LABELS.affiliation, fd.affiliation);
-  if (fd.affiliation === 'other' && fd.affiliationOther) {
-    affText = `Other: ${fd.affiliationOther}`;
-  }
-  blocks.push(bullet(labelValue('Affiliation', affText)));
-
-  const role = deriveRole(fd);
-  if (role) {
-    blocks.push(bullet(labelValue('Role', role)));
-  }
-
-  if (fd.affiliation === 'industry') {
-    const industries = labelArray(LABELS.industry, fd.industry);
-    if (fd.industryOther) industries.push(fd.industryOther);
-    if (industries.length > 0) {
-      blocks.push(bullet(labelValue('Industries', industries.join(', '))));
-    }
-  }
-
-  const communities = labelArray(LABELS.communities, fd.communities);
-  if (fd.communitiesOther) communities.push(fd.communitiesOther);
-  if (communities.length > 0) {
-    blocks.push(bullet(labelValue('Communities', communities.join(', '))));
-  }
-  return blocks;
-}
-
-function buildHardwareSection(fd) {
-  const blocks = [];
-  blocks.push(heading2('Hardware'));
-  blocks.push(bullet(labelValue('Robot Access', label(LABELS.robotAccess, fd.robotAccess))));
-
-  const hasRobot = ['own', 'lab', 'planning'].includes(fd.robotAccess);
-  if (hasRobot) {
-    const types = labelArray(LABELS.robotType, fd.robotType);
-    if (fd.robotTypeOther) types.push(fd.robotTypeOther);
-    if (types.length > 0) {
-      blocks.push(bullet(labelValue('Robot Types', types.join(', '))));
-    }
-
-    const brands = labelArray(LABELS.robotBrand, fd.robotBrand);
-    if (fd.robotBrandOther) brands.push(fd.robotBrandOther);
-    if (brands.length > 0) {
-      blocks.push(bullet(labelValue('Robot Brands', brands.join(', '))));
-    }
-  }
-
-  blocks.push(bullet(labelValue('Simulation', label(LABELS.simAccess, fd.simAccess))));
-  return blocks;
-}
-
-function buildInterestSection(fd) {
-  const blocks = [];
-  blocks.push(heading2('Interest'));
-  const useCases = labelArray(LABELS.useCase, fd.useCase);
-  blocks.push(bullet(labelValue('Use Cases', useCases.join(', ') || '—')));
-
-  const apps = labelArray(LABELS.applications, fd.applications);
-  if (fd.applicationsOther) apps.push(fd.applicationsOther);
-  blocks.push(bullet(labelValue('Tasks', apps.join(', ') || '—')));
-
-  let shareText = label(LABELS.shareWilling, fd.shareWilling);
-  if (fd.shareWilling === 'yes') {
-    const shareTypes = labelArray(LABELS.shareType, fd.shareType);
-    if (shareTypes.length > 0) {
-      shareText += ` → ${shareTypes.join(', ')}`;
-    }
-  }
-  blocks.push(bullet(labelValue('Share', shareText)));
-  return blocks;
-}
-
-function buildEngagementSection(fd) {
-  const blocks = [];
-  blocks.push(heading2('Engagement'));
-  blocks.push(bullet(labelValue('Event', label(LABELS.eventAttendance, fd.eventAttendance))));
-
-  let referralText = label(LABELS.referralSource, fd.referralSource);
-  if (fd.referralSource === 'other' && fd.referralSourceOther) {
-    referralText = `Other: ${fd.referralSourceOther}`;
-  }
-  blocks.push(bullet(labelValue('Referral', referralText)));
-  return blocks;
-}
-
-function buildPageContent(row) {
-  const fd = row.form_data || {};
-  return [
-    ...buildBackgroundSection(fd),
-    divider(),
-    ...buildHardwareSection(fd),
-    divider(),
-    ...buildInterestSection(fd),
-    divider(),
-    ...buildEngagementSection(fd),
-  ];
 }
 
 // ============================================
 // Notion — Create a page in the database
 // ============================================
 
-async function createNotionPage(properties, children) {
+async function createNotionPage(properties) {
   const body = {
     parent: { database_id: CONFIG.notion.databaseId },
     properties,
-    children,
   };
 
   const res = await fetch('https://api.notion.com/v1/pages', {
@@ -413,7 +399,7 @@ async function createNotionPage(properties, children) {
 }
 
 // ============================================
-// Dry-run preview — terminal-formatted profile
+// Dry-run preview
 // ============================================
 
 function printPreview(row) {
@@ -421,54 +407,48 @@ function printPreview(row) {
   const name = row.full_name || fd.fullName || 'Unknown';
   const email = row.email || fd.email || '';
   const org = row.organization || fd.organization || '';
-  const country = label(LABELS.country, row.country || fd.country);
+  const country = resolveLabel('country', row.country || fd.country);
   const social = row.social_profile || fd.socialProfile || '';
-
-  let affText = label(LABELS.affiliation, fd.affiliation);
-  if (fd.affiliation === 'other' && fd.affiliationOther) affText = `Other: ${fd.affiliationOther}`;
-  const role = deriveRole(fd);
-
-  const robotText = label(LABELS.robotAccess, fd.robotAccess);
-  const hasRobot = ['own', 'lab', 'planning'].includes(fd.robotAccess);
-  const brands = hasRobot ? labelArray(LABELS.robotBrand, fd.robotBrand) : [];
-  if (hasRobot && fd.robotBrandOther) brands.push(fd.robotBrandOther);
-  const types = hasRobot ? labelArray(LABELS.robotType, fd.robotType) : [];
-  if (hasRobot && fd.robotTypeOther) types.push(fd.robotTypeOther);
-
-  const sim = label(LABELS.simAccess, fd.simAccess);
-  const useCases = labelArray(LABELS.useCase, fd.useCase);
-  const apps = labelArray(LABELS.applications, fd.applications);
-  if (fd.applicationsOther) apps.push(fd.applicationsOther);
-  const event = label(LABELS.eventAttendance, fd.eventAttendance);
-
-  let referral = label(LABELS.referralSource, fd.referralSource);
-  if (fd.referralSource === 'other' && fd.referralSourceOther) referral = fd.referralSourceOther;
-
-  const share = label(LABELS.shareWilling, fd.shareWilling);
-  const communities = labelArray(LABELS.communities, fd.communities);
-  if (fd.communitiesOther) communities.push(fd.communitiesOther);
 
   const w = PREVIEW_WIDTH;
   const line = '─'.repeat(w);
-  const pad = (s) => s + ' '.repeat(Math.max(0, w - 2 - s.length));
+  const wrap = (s) => {
+    const lines = [];
+    while (s.length > w - 4) {
+      lines.push(s.substring(0, w - 4));
+      s = s.substring(w - 4);
+    }
+    lines.push(s);
+    return lines;
+  };
 
   console.log(`  ┌${line}┐`);
-  console.log(`  │ ${pad(`${name} — ${org}`)}│`);
-  console.log(`  │ ${pad(`${email} · ${country}`)}│`);
-  if (social) console.log(`  │ ${pad(social)}│`);
-  console.log(`  ├${line}┤`);
-  console.log(`  │ ${pad(`Affiliation: ${affText}${role ? ' → ' + role : ''}`)}│`);
-  if (communities.length) console.log(`  │ ${pad(`Communities: ${communities.join(', ')}`)}│`);
-  console.log(`  ├${line}┤`);
-  console.log(`  │ ${pad(`Robot: ${robotText}`)}│`);
-  if (types.length) console.log(`  │ ${pad(`  Types: ${types.join(', ')}`)}│`);
-  if (brands.length) console.log(`  │ ${pad(`  Brands: ${brands.join(', ')}`)}│`);
-  console.log(`  │ ${pad(`Sim: ${sim}`)}│`);
-  console.log(`  ├${line}┤`);
-  console.log(`  │ ${pad(`Use Cases: ${useCases.join(', ') || '—'}`)}│`);
-  console.log(`  │ ${pad(`Tasks: ${apps.join(', ') || '—'}`)}│`);
-  console.log(`  │ ${pad(`Share: ${share} | Event: ${event}`)}│`);
-  console.log(`  │ ${pad(`Referral: ${referral}`)}│`);
+  for (const l of wrap(`${name} — ${org}`)) {
+    console.log(`  │ ${l.padEnd(w - 2)}│`);
+  }
+  for (const l of wrap(`${email} · ${country}`)) {
+    console.log(`  │ ${l.padEnd(w - 2)}│`);
+  }
+  if (social) {
+    for (const l of wrap(social)) {
+      console.log(`  │ ${l.padEnd(w - 2)}│`);
+    }
+  }
+
+  for (const section of SECTIONS) {
+    if (section.title === 'Contact Information') continue;
+    const text = buildSectionText(section, fd);
+    if (!text) continue;
+
+    console.log(`  ├${line}┤`);
+    console.log(`  │ ${section.title.padEnd(w - 2)}│`);
+    console.log(`  ├${line}┤`);
+    for (const sLine of text.split('\n')) {
+      for (const wl of wrap(sLine)) {
+        console.log(`  │ ${wl.padEnd(w - 2)}│`);
+      }
+    }
+  }
   console.log(`  └${line}┘`);
 }
 
@@ -482,6 +462,18 @@ async function main() {
 
   if (DRY_RUN) console.log('[DRY RUN — no Notion pages will be created]\n');
 
+  // Show extracted structure
+  console.log('Form structure (auto-extracted from index.html):');
+  for (const s of SECTIONS) {
+    const fieldKeys = s.fields.filter(f => !f.key.endsWith('Other') && !PROFILE_KEYS.includes(f.key)).map(f => f.key);
+    if (s.title === 'Contact Information') {
+      console.log(`  ${s.title}: [profile columns]`);
+    } else {
+      console.log(`  ${s.title}: ${fieldKeys.join(', ')}`);
+    }
+  }
+  console.log('');
+
   // Step 1: Fetch from Supabase
   console.log('Fetching Supabase rows...');
   const rows = await fetchSupabaseRows();
@@ -492,7 +484,13 @@ async function main() {
     return;
   }
 
-  // Step 2: Check existing Notion entries
+  // Step 2: Ensure Notion DB has section columns
+  if (!DRY_RUN) {
+    console.log('Ensuring Notion columns exist...');
+    await ensureSectionColumns();
+  }
+
+  // Step 3: Check existing Notion entries
   console.log('Checking existing Notion entries...');
   const existingEmails = DRY_RUN ? new Set() : await getExistingEmails();
   console.log(`  Found ${existingEmails.size} already synced.\n`);
@@ -516,19 +514,18 @@ async function main() {
 
     try {
       const properties = buildProperties(row);
-      const children = buildPageContent(row);
 
       if (DRY_RUN) {
         printPreview(row);
+        console.log('');
         created++;
         continue;
       }
 
-      await createNotionPage(properties, children);
+      await createNotionPage(properties);
       console.log(`  ✓ Created: ${name} (${email})`);
       created++;
 
-      // Small delay to respect Notion rate limits (3 req/sec)
       await new Promise(resolve => setTimeout(resolve, NOTION_RATE_LIMIT_DELAY));
     } catch (err) {
       console.error(`  ✗ Failed: ${name} (${email}) — ${err.message}`);
