@@ -262,20 +262,27 @@ async function ensureSectionColumns() {
   const db = await res.json();
   const existingProps = Object.keys(db.properties);
 
-  // Find missing section columns
+  // Find missing columns (sections + Supabase ID)
   const neededColumns = SECTIONS
     .filter(s => s.title !== 'Contact Information')
     .map(s => s.title);
 
   const missing = neededColumns.filter(col => !existingProps.includes(col));
-  if (missing.length === 0) return;
+  const needsSupabaseId = !existingProps.includes('Supabase ID');
 
-  console.log(`  Adding Notion columns: ${missing.join(', ')}`);
+  if (missing.length === 0 && !needsSupabaseId) return;
 
-  // Add missing columns as rich_text properties
+  const toAdd = [...missing];
+  if (needsSupabaseId) toAdd.push('Supabase ID');
+  console.log(`  Adding Notion columns: ${toAdd.join(', ')}`);
+
+  // Add missing columns
   const properties = {};
   for (const col of missing) {
     properties[col] = { rich_text: {} };
+  }
+  if (needsSupabaseId) {
+    properties['Supabase ID'] = { number: {} };
   }
 
   const updateRes = await fetch(
@@ -345,6 +352,7 @@ function buildProperties(row) {
     'Email': { email: row.email || fd.email || null },
     'Organization': { rich_text: richText(row.organization || fd.organization || '') },
     'Country': { select: { name: resolveLabel('country', row.country || fd.country) || 'Other' } },
+    'Supabase ID': { number: row.id },
   };
 
   // Social Profile — only include if valid URL
