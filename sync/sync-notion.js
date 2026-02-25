@@ -262,27 +262,20 @@ async function ensureSectionColumns() {
   const db = await res.json();
   const existingProps = Object.keys(db.properties);
 
-  // Find missing columns (sections + Supabase ID)
+  // Find missing section columns
   const neededColumns = SECTIONS
     .filter(s => s.title !== 'Contact Information')
     .map(s => s.title);
 
   const missing = neededColumns.filter(col => !existingProps.includes(col));
-  const needsSupabaseId = !existingProps.includes('Supabase ID');
+  if (missing.length === 0) return;
 
-  if (missing.length === 0 && !needsSupabaseId) return;
+  console.log(`  Adding Notion columns: ${missing.join(', ')}`);
 
-  const toAdd = [...missing];
-  if (needsSupabaseId) toAdd.push('Supabase ID');
-  console.log(`  Adding Notion columns: ${toAdd.join(', ')}`);
-
-  // Add missing columns
+  // Add missing columns as rich_text properties
   const properties = {};
   for (const col of missing) {
     properties[col] = { rich_text: {} };
-  }
-  if (needsSupabaseId) {
-    properties['Supabase ID'] = { number: {} };
   }
 
   const updateRes = await fetch(
@@ -348,17 +341,17 @@ function buildProperties(row) {
   const fd = row.form_data || {};
 
   const props = {
-    'Name': { title: richText(row.full_name || fd.fullName || '') },
+    'Supabase ID': { title: richText(String(row.id)) },
+    'Full Name': { rich_text: richText(row.full_name || fd.fullName || '') },
     'Email': { email: row.email || fd.email || null },
-    'Organization': { rich_text: richText(row.organization || fd.organization || '') },
+    'Organization / Company': { rich_text: richText(row.organization || fd.organization || '') },
     'Country': { select: { name: resolveLabel('country', row.country || fd.country) || 'Other' } },
-    'Supabase ID': { number: row.id },
   };
 
-  // Social Profile — only include if valid URL
+  // X or LinkedIn Profile — only include if valid URL
   const social = row.social_profile || fd.socialProfile || '';
   if (social && social.startsWith('http')) {
-    props['Social Profile'] = { url: social };
+    props['X or LinkedIn Profile'] = { url: social };
   }
 
   // Submitted date
