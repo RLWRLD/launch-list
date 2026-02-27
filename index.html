@@ -1568,30 +1568,28 @@
                 const timeoutId = setTimeout(function() { controller.abort(); }, FETCH_TIMEOUT_MS);
 
                 try {
-                    // Send to Supabase
-                    const response = await fetch(`${SUPABASE_URL}/rest/v1/waitlist`, {
+                    // Send to Supabase via RPC (upsert: new signup = INSERT, same email = UPDATE)
+                    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/waitlist_signup`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'apikey': SUPABASE_ANON_KEY,
-                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                            'Prefer': 'return=minimal'
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                         },
                         body: JSON.stringify({
-                            email: data.email,
-                            full_name: data.fullName,
-                            organization: data.organization,
-                            country: data.country,
-                            social_profile: data.socialProfile || null,
-                            form_data: data
+                            p_email: data.email,
+                            p_full_name: data.fullName,
+                            p_organization: data.organization,
+                            p_country: data.country,
+                            p_social_profile: data.socialProfile || null,
+                            p_form_data: data
                         }),
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
 
-                    if (response.ok || response.status === HTTP_CONFLICT) {
-                        // Show success for both new and duplicate signups
-                        // (prevents email enumeration)
+                    if (response.ok) {
+                        // Success for both new and returning signups
                         formModified = false;
                         document.querySelector('.hero-subtitle').textContent =
                             'General-purpose dexterity, purpose-built. RLDX is coming for the real world.';

@@ -1,64 +1,128 @@
 # RLDX Waitlist
 
-RLDX Launch List 등록 페이지 + Notion 동기화 + 일일 백업 스크립트.
+RLDX Launch List 등록 페이지 + 자동 이메일 확인 + Notion 동기화 + Slack 알림 + 일일 백업.
 
-## 구조
+## 아키텍처
+
+```
+사용자 폼 제출 (index.html)
+        ↓
+Supabase REST API → waitlist 테이블 INSERT
+        ↓
+        ├─→ [즉시] Database Webhook → Edge Function → Resend API
+        │   → 확인 이메일 자동 발송
+        │
+        ├─→ [5분마다] sync-notion.js (cron)
+        │   → Notion DB 동기화 + Slack 알림
+        │
+        └─→ [매일 00:00 KST] backup-supabase.js (cron)
+            → JSON 백업 + git commit & push
+```
+
+## 프로젝트 구조
 
 ```
 waitlist/
-├── index.html                      # Launch List 폼 (HTML/CSS/JS + Supabase)
+├── index.html                          # Launch List 폼 (HTML/CSS/JS + Supabase)
 ├── rlwrld/
-│   ├── css/styles.css              # 공통 스타일
-│   ├── js/script.js                # 공통 JS (progress bar, scroll 등)
-│   └── assets/logos/               # 로고 SVG
+│   ├── css/styles.css                  # 공통 스타일 (다크 테마)
+│   ├── js/script.js                    # 공통 JS (progress bar, scroll 등)
+│   └── assets/logos/                   # 로고 SVG
+├── supabase/
+│   ├── config.toml                     # Supabase 로컬 설정
+│   └── functions/
+│       └── send-confirmation-email/
+│           ├── index.ts                # 확인 이메일 Edge Function (Deno/TypeScript)
+│           └── deno.json               # Deno import map
 ├── sync/
-│   ├── sync-notion.js              # Supabase → Notion 동기화 (cron 5분)
-│   ├── backup-supabase.js          # Supabase 일일 백업 (cron 매일)
-│   ├── sync-config.json            # API 키 설정 (gitignored)
-│   ├── sync-config.example.json    # 설정 파일 템플릿
-│   ├── backups/                    # 일일 백업 저장 디렉토리
-│   ├── logs/                       # 싱크/백업 로그
-│   └── DATA_PIPELINE.md            # 데이터 파이프라인 상세 문서
-├── SUPABASE_SETUP.md               # Supabase 테이블/RLS 설정 가이드
-└── RLDX_Waitlist_Form_Spec.md      # 폼 스펙 문서
+│   ├── sync-notion.js                  # Supabase → Notion 동기화 + Slack 알림
+│   ├── backup-supabase.js              # Supabase 일일 백업
+│   ├── sync-config.json                # API 키 설정 (gitignored)
+│   ├── sync-config.example.json        # 설정 파일 템플릿
+│   ├── email-template.md               # 이메일 템플릿 레퍼런스
+│   ├── DATA_PIPELINE.md                # 데이터 파이프라인 상세 문서
+│   ├── backups/                        # 일일 백업 저장 (YYYY-MM-DD/)
+│   └── logs/                           # 동기화/백업 로그
+├── QA/
+│   ├── run-all-tests.sh                # Playwright 테스트 실행 스크립트
+│   ├── tests/                          # Playwright 테스트 코드
+│   ├── Option_Checklist.md             # 226항목 테스트 체크리스트
+│   ├── Flow_Edge_Case.md               # 플로우 엣지케이스 문서
+│   └── Option_Edge_Case.md             # 옵션 엣지케이스 문서
+├── SUPABASE_SETUP.md                   # Supabase 테이블/RLS 설정 가이드
+├── OPERATIONS.md                       # 운영/인수인계 가이드 ← 신규
+└── README.md
 ```
 
-## Launch List 폼
+## 기능별 요약
 
-`index.html`을 웹서버로 서빙하면 됨. 제출된 데이터는 Supabase `waitlist` 테이블에 저장.
+### 1. Launch List 폼
 
-### 로컬 테스트
+`index.html` — 정적 HTML/CSS/JS, 프레임워크 없음.
+
+- 4개 섹션: Who You Are / Robot & Hardware / Interest in RLDX / Event & Engagement
+- 조건부 필드 표시 (radio 선택에 따라)
+- 이메일 중복 방지 (Supabase UNIQUE INDEX)
+- Honeypot 안티스팸 + 3초 제출 쿨다운
+- 제출 데이터: 핵심 필드는 개별 컬럼, 전체 응답은 `form_data` JSONB
 
 ```bash
-# 아래 중 하나로 로컬 서버 실행
+# 로컬 테스트 (file:// 불가, 반드시 HTTP 서버)
 npx serve .
 # 또는
 python3 -m http.server 8080
 ```
 
-브라우저에서 `http://localhost:8080` (또는 `http://localhost:3000`) 접속.
+### 2. 확인 이메일 (자동)
 
-> `file://`로 직접 열면 Supabase 연결이 안 됨 — 반드시 HTTP 서버 필요.
+Supabase Edge Function + Database Webhook + Resend API.
 
-## Notion 동기화
+- waitlist INSERT 즉시 자동 트리거 (프론트엔드 수정 불필요)
+- 커스텀 도메인 발신 (`launch@rlwrld.ai`)
+- HTML + Plain Text 이메일 (다크 테마, 사이트 디자인 매칭)
+- 중복 발송 방지 (`confirmation_sent_at` 체크)
+- 발송 로그: `email_logs` 테이블
+- 모니터링: Resend 대시보드 + Supabase `email_logs`
 
-Supabase에 저장된 waitlist 데이터를 Notion 데이터베이스로 동기화.
+### 3. Notion 동기화 (5분마다)
+
+`sync/sync-notion.js` — Node.js 18+, 외부 패키지 불필요.
 
 - index.html을 자동 파싱하여 라벨/섹션 구조 추출 (하드코딩 매핑 없음)
-- 코드값을 사람이 읽을 수 있는 라벨로 변환 (예: `rd` → `R&D / Research`)
-- 섹션별로 질문:답변 형태의 병합 텍스트 생성
+- 코드값 → 사람이 읽을 수 있는 라벨 변환
+- 섹션별 질문:답변 형태의 병합 텍스트 생성
 - email 기준 중복 방지
 - Notion DB에 섹션 컬럼이 없으면 자동 생성
 
-### 설정
+### 4. Slack 알림 (동기화 시)
 
-1. `sync/sync-config.example.json`을 `sync/sync-config.json`으로 복사:
+Notion 동기화와 함께 실행. 새 가입자가 있을 때 Slack 채널에 알림.
+
+- `sync-config.json`의 `slack.webhookUrl`과 `slack.enabled`로 제어
+- 가입자 이름, 이메일, 소속, 국가 정보 포함
+
+### 5. 일일 백업
+
+`sync/backup-supabase.js` — 매일 KST 00:00에 실행.
+
+- Supabase 전체 데이터를 `sync/backups/YYYY-MM-DD/waitlist.json`에 저장
+- 자동 git commit + push
+
+### 6. QA 테스트
+
+Playwright 기반 자동화 테스트 + 수동 체크리스트 226항목.
+
+```bash
+cd QA && bash run-all-tests.sh
+```
+
+## 설정
+
+### sync-config.json
 
 ```bash
 cp sync/sync-config.example.json sync/sync-config.json
 ```
-
-2. `sync/sync-config.json`에 실제 키 입력:
 
 ```json
 {
@@ -69,60 +133,56 @@ cp sync/sync-config.example.json sync/sync-config.json
   "notion": {
     "token": "YOUR_NOTION_API_TOKEN",
     "databaseId": "YOUR_NOTION_DATABASE_ID"
+  },
+  "slack": {
+    "webhookUrl": "YOUR_SLACK_WEBHOOK_URL",
+    "enabled": true
   }
 }
 ```
 
-- **Supabase service_role key**: Supabase Dashboard → Settings → API
-- **Notion token**: [notion.so/my-integrations](https://www.notion.so/my-integrations) 에서 생성
-- **Database ID**: Notion 데이터베이스 URL에서 추출 (`notion.so/{DATABASE_ID}?v=...`)
-
-### 실행
-
-```bash
-# 동기화 실행
-node sync/sync-notion.js
-
-# 미리보기 (Notion에 실제로 추가하지 않음)
-node sync/sync-notion.js --dry-run
-```
-
-Node.js 18+ 필요 (외부 패키지 불필요).
-
-### Notion 데이터베이스 구조
-
-#### Profile columns (개별)
-
-| Column | Type | Source |
-|---|---|---|
-| Supabase ID | Title (메인) | `id` (serial) |
-| Full Name | Rich text | `full_name` |
-| Email | Email | `email` |
-| Organization / Company | Rich text | `organization` |
-| Country | Select | `country` → 텍스트 변환 |
-| X or LinkedIn Profile | URL | `social_profile` |
-| Submitted | Date | `created_at` |
-
-#### Section columns (병합 텍스트)
-
-| Column | 포함 필드 |
-|---|---|
-| Who You Are | affiliation, academicRole, industryRole, industry, startupRole, communities + Other fields |
-| Robot & Hardware | robotAccess, robotType, robotBrand, simAccess + Other fields |
-| Interest in RLDX | useCase, applications, shareWilling, shareType + Other fields |
-| Event & Engagement | eventAttendance, referralSource + Other fields |
-
 ### Cron 설정
 
 ```crontab
-# Notion sync every 5 minutes
+# Notion sync + Slack alert every 5 minutes
 */5 * * * * /usr/bin/node /home/rlwrld/projects/waitlist/sync/sync-notion.js >> /home/rlwrld/projects/waitlist/sync/logs/sync.log 2>&1
 
 # Daily backup at KST 00:00 (UTC 15:00)
 0 15 * * * /usr/bin/node /home/rlwrld/projects/waitlist/sync/backup-supabase.js >> /home/rlwrld/projects/waitlist/sync/logs/backup.log 2>&1
 ```
 
-## 일일 백업
+## DB 스키마
 
-`sync/backup-supabase.js`가 Supabase 전체 데이터를 `sync/backups/YYYY-MM-DD/waitlist.json`에 저장.
-백업 후 자동으로 git commit + push.
+### waitlist 테이블
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | bigint (자동) | Primary key |
+| `created_at` | timestamptz (자동) | 제출 시각 |
+| `email` | text, NOT NULL, UNIQUE | 이메일 |
+| `full_name` | text | 이름 |
+| `organization` | text | 소속 |
+| `country` | text | 국가 코드 |
+| `social_profile` | text | X 또는 LinkedIn URL |
+| `form_data` | jsonb | 폼 전체 응답 JSON |
+| `confirmation_sent_at` | timestamptz | 확인 이메일 발송 시각 (NULL = 미발송) |
+
+### email_logs 테이블
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | bigint (자동) | Primary key |
+| `waitlist_id` | bigint (FK → waitlist.id) | 대상 가입자 |
+| `email` | text | 수신자 이메일 |
+| `status` | text | pending / sent / failed |
+| `resend_id` | text | Resend API 응답 ID |
+| `error_message` | text | 실패 시 에러 메시지 |
+| `created_at` | timestamptz | 기록 시각 |
+| `sent_at` | timestamptz | 발송 완료 시각 |
+
+## 관련 문서
+
+- [SUPABASE_SETUP.md](SUPABASE_SETUP.md) — Supabase 테이블/RLS 초기 설정
+- [OPERATIONS.md](OPERATIONS.md) — 운영/인수인계 가이드 (외부 서비스 세팅, 로그인 정보)
+- [sync/DATA_PIPELINE.md](sync/DATA_PIPELINE.md) — 데이터 파이프라인 상세 구조
+- [sync/email-template.md](sync/email-template.md) — 이메일 템플릿 레퍼런스

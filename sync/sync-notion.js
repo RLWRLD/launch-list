@@ -481,7 +481,8 @@ function buildSlackMessage(newRows, totalCount) {
     const org = row.organization || fd.organization || '';
     const role = getRole(fd);
     const social = row.social_profile || fd.socialProfile || '';
-    const displayName = social && social.startsWith('http') ? `<${social}|${name}>` : name;
+    const socialUrl = social && social.startsWith('http') ? social : social && social.includes('.') ? `https://${social}` : '';
+    const displayName = socialUrl ? `<${socialUrl}|${name}>` : name;
     const parts = [`#${id} ${displayName}`];
     if (org) parts.push(org);
     if (role) parts.push(role);
