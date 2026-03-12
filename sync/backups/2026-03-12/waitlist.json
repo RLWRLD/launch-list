@@ -1,0 +1,373 @@
+{
+  "meta": {
+    "date": "2026-03-12",
+    "timestamp": "2026-03-12T06:00:02.210Z",
+    "totalRows": 7
+  },
+  "rows": [
+    {
+      "id": 1,
+      "created_at": "2026-02-27T01:07:08.805284+00:00",
+      "email": "choihongmin@keonhwa.com",
+      "full_name": "Choi Hongmin",
+      "organization": "Keonhwa Corporation",
+      "country": "KR",
+      "social_profile": "https://www.linkedin.com/in/choihongmin/",
+      "form_data": {
+        "email": "choihongmin@keonhwa.com",
+        "country": "KR",
+        "useCase": [
+          "finetune",
+          "deploy",
+          "prototype"
+        ],
+        "fullName": "Choi Hongmin",
+        "industry": "manufacturing",
+        "shareType": "testimonial",
+        "simAccess": "no",
+        "affiliation": "industry",
+        "communities": "none",
+        "robotAccess": "interested",
+        "applications": [
+          "bin_picking",
+          "assembly",
+          "packaging",
+          "tool_use",
+          "handover",
+          "cable",
+          "cloth",
+          "cleaning"
+        ],
+        "industryRole": "operations",
+        "organization": "Keonhwa Corporation",
+        "shareWilling": "yes",
+        "industryOther": "",
+        "socialProfile": "https://www.linkedin.com/in/choihongmin/",
+        "referralSource": "word_of_mouth",
+        "robotTypeOther": "",
+        "eventAttendance": "kr_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-02-27T07:27:16.367+00:00"
+    },
+    {
+      "id": 2,
+      "created_at": "2026-02-27T01:38:07.651297+00:00",
+      "email": "tedkim@caring.co.kr",
+      "full_name": "Taesung Kim",
+      "organization": "caring",
+      "country": "KR",
+      "social_profile": null,
+      "form_data": {
+        "email": "tedkim@caring.co.kr",
+        "country": "KR",
+        "useCase": [
+          "benchmark",
+          "integrate",
+          "prototype"
+        ],
+        "fullName": "Taesung Kim",
+        "robotType": "humanoid",
+        "simAccess": "rtx4090_plus",
+        "robotBrand": "unitree",
+        "affiliation": "startup",
+        "communities": [
+          "lerobot",
+          "huggingface"
+        ],
+        "robotAccess": "own",
+        "startupRole": "founder",
+        "applications": [
+          "assembly",
+          "cloth",
+          "cleaning"
+        ],
+        "organization": "caring",
+        "shareWilling": "maybe",
+        "industryOther": "",
+        "socialProfile": "",
+        "referralSource": "news",
+        "robotTypeOther": "",
+        "eventAttendance": "kr_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-02-27T07:28:16.432+00:00"
+    },
+    {
+      "id": 3,
+      "created_at": "2026-02-27T03:59:55.883809+00:00",
+      "email": "hsshin42@kaist.ac.kr",
+      "full_name": "Hyosup Shin",
+      "organization": "NMAIL, KAIST",
+      "country": "KR",
+      "social_profile": "www.linkedin.com/in/hsshin42",
+      "form_data": {
+        "email": "hsshin42@kaist.ac.kr",
+        "country": "KR",
+        "useCase": [
+          "benchmark",
+          "finetune",
+          "integrate",
+          "hobby"
+        ],
+        "fullName": "Hyosup Shin",
+        "robotType": [
+          "bimanual",
+          "single_arm",
+          "dexterous_hand"
+        ],
+        "simAccess": "rtx4090_plus",
+        "robotBrand": [
+          "custom",
+          "other"
+        ],
+        "affiliation": "academic",
+        "communities": [
+          "huggingface",
+          "ros"
+        ],
+        "robotAccess": "own",
+        "academicRole": "student",
+        "applications": [
+          "assembly",
+          "tool_use",
+          "cable",
+          "other"
+        ],
+        "organization": "NMAIL, KAIST",
+        "shareWilling": "maybe",
+        "industryOther": "",
+        "socialProfile": "www.linkedin.com/in/hsshin42",
+        "referralSource": "social",
+        "robotTypeOther": "",
+        "eventAttendance": "kr_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-02-27T07:28:45.637+00:00"
+    },
+    {
+      "id": 4,
+      "created_at": "2026-02-27T19:52:21.018457+00:00",
+      "email": "robotchip@seengrip.com",
+      "full_name": "하영열",
+      "organization": "SeeNGrip Inc.",
+      "country": "KR",
+      "social_profile": null,
+      "form_data": {
+        "email": "robotchip@seengrip.com",
+        "country": "KR",
+        "useCase": [
+          "benchmark",
+          "finetune",
+          "integrate",
+          "deploy"
+        ],
+        "fullName": "하영열",
+        "robotType": "single_arm",
+        "simAccess": "rtx4090_plus",
+        "robotBrand": [
+          "franka",
+          "ur",
+          "agilex",
+          "trossen",
+          "lerobot_so100",
+          "custom"
+        ],
+        "affiliation": "startup",
+        "communities": "none",
+        "robotAccess": "own",
+        "startupRole": "founder",
+        "applications": "cable",
+        "organization": "SeeNGrip Inc.",
+        "shareWilling": "maybe",
+        "industryOther": "",
+        "socialProfile": "",
+        "referralSource": "word_of_mouth",
+        "robotTypeOther": "",
+        "eventAttendance": "kr_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-02-27T19:52:22.209+00:00"
+    },
+    {
+      "id": 5,
+      "created_at": "2026-02-28T06:37:27.278763+00:00",
+      "email": "smjoo@mail.kaeri.re.kr",
+      "full_name": "Sungmoon Joo",
+      "organization": "Korea Atomic Energy Research Institute",
+      "country": "KR",
+      "social_profile": null,
+      "form_data": {
+        "email": "smjoo@mail.kaeri.re.kr",
+        "country": "KR",
+        "useCase": [
+          "finetune",
+          "prototype"
+        ],
+        "fullName": "Sungmoon Joo",
+        "robotType": "single_arm",
+        "simAccess": "rtx4090_plus",
+        "robotBrand": [
+          "franka",
+          "kuka",
+          "ur",
+          "other"
+        ],
+        "affiliation": "academic",
+        "communities": [
+          "lerobot",
+          "huggingface",
+          "ros"
+        ],
+        "robotAccess": "lab",
+        "academicRole": "professor",
+        "applications": [
+          "bin_picking",
+          "assembly",
+          "packaging",
+          "tool_use",
+          "handover",
+          "cable",
+          "door"
+        ],
+        "organization": "Korea Atomic Energy Research Institute",
+        "shareWilling": "maybe",
+        "industryOther": "",
+        "socialProfile": "",
+        "referralSource": "word_of_mouth",
+        "robotTypeOther": "",
+        "eventAttendance": "kr_inperson",
+        "robotBrandOther": "Robotis(Openmanipulator Pro, OMY)",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-02-28T06:37:28.409+00:00"
+    },
+    {
+      "id": 6,
+      "created_at": "2026-02-28T15:09:23.004776+00:00",
+      "email": "hukj5@mail2.sysu.edu.cn",
+      "full_name": "Kejun Hu",
+      "organization": "Sun Yat-Sen University",
+      "country": "CN",
+      "social_profile": null,
+      "form_data": {
+        "email": "hukj5@mail2.sysu.edu.cn",
+        "country": "CN",
+        "useCase": [
+          "finetune",
+          "hobby"
+        ],
+        "fullName": "Kejun Hu",
+        "robotType": [
+          "bimanual",
+          "single_arm",
+          "mobile"
+        ],
+        "simAccess": "rtx4090_plus",
+        "robotBrand": [
+          "aloha",
+          "franka",
+          "unitree"
+        ],
+        "affiliation": "academic",
+        "robotAccess": "lab",
+        "academicRole": "student",
+        "applications": [
+          "tool_use",
+          "handover",
+          "writing"
+        ],
+        "organization": "Sun Yat-Sen University",
+        "shareWilling": "maybe",
+        "industryOther": "",
+        "socialProfile": "",
+        "referralSource": "social",
+        "robotTypeOther": "",
+        "eventAttendance": "jp_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-02-28T15:09:24.187+00:00"
+    },
+    {
+      "id": 7,
+      "created_at": "2026-03-02T17:19:59.918823+00:00",
+      "email": "marisa@fractalabs.xyz",
+      "full_name": "Marisa McKnight",
+      "organization": "Fractal Technologies Incorporated",
+      "country": "US",
+      "social_profile": "https://x.com/nrvanaai",
+      "form_data": {
+        "email": "marisa@fractalabs.xyz",
+        "country": "US",
+        "useCase": [
+          "integrate",
+          "deploy",
+          "prototype"
+        ],
+        "fullName": "Marisa McKnight",
+        "robotType": [
+          "humanoid",
+          "bimanual"
+        ],
+        "shareType": "content",
+        "simAccess": "rtx4090_plus",
+        "robotBrand": [
+          "unitree",
+          "agilex",
+          "rlwrld"
+        ],
+        "affiliation": "startup",
+        "communities": "openarm",
+        "robotAccess": "lab",
+        "startupRole": "founder",
+        "applications": [
+          "packaging",
+          "handover"
+        ],
+        "organization": "Fractal Technologies Incorporated",
+        "shareWilling": "yes",
+        "industryOther": "",
+        "socialProfile": "https://x.com/nrvanaai",
+        "referralSource": "word_of_mouth",
+        "robotTypeOther": "",
+        "eventAttendance": "jp_inperson",
+        "robotBrandOther": "",
+        "affiliationOther": "",
+        "communitiesOther": "",
+        "startupRoleOther": "",
+        "applicationsOther": "",
+        "referralSourceOther": ""
+      },
+      "confirmation_sent_at": "2026-03-02T17:20:01.391+00:00"
+    }
+  ]
+}
